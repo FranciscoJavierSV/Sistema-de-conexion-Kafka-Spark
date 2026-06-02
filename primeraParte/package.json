@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@faker-js/faker": "^10.4.0",
+    "dotenv": "^16.3.1",
     "kafkajs": "^2.2.4"
   }
 }

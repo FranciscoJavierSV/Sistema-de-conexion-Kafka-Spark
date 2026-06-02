@@ -30,69 +30,104 @@
 
 ## Uso recomendado
 
-### Kafka
+1. Edita `.env` en la raíz del proyecto con los valores de tu red.
 
-1. Crear la red Docker:
+2. Crea la red Docker si no existe:
 
-```bash
 docker network inspect kafka-redes-final >/dev/null 2>&1 || docker network create kafka-redes-final
-```
 
-2. En cada máquina Kafka, ejecutar el script correspondiente:
+3. Inicia los nodos Kafka:
 
-- `primeraParte/Maquina1/run.sh`
-- `primeraParte/Maquina2/run.sh`
-- `primeraParte/Maquina3/run.sh`
+bash primeraParte/Maquina1/run.sh
+bash primeraParte/Maquina2/run.sh
+bash primeraParte/Maquina3/run.sh
 
-3. Crear los tópicos:
+4. Crea los tópicos:
 
-```bash
-cd /home/javi/redes/primeraParte
+cd primeraParte
 bash create_topics.sh
-```
 
-4. Ejecutar el productor:
+5. Instala dependencias y ejecuta el productor:
 
-```bash
-cd /home/javi/redes/primeraParte
+cd primeraParte
 npm install
 node producer.js
-```
 
-5. Ejecutar el consumidor:
+6. Ejecuta el consumidor:
 
-```bash
-cd /home/javi/redes/primeraParte
+cd primeraParte
 node consumer.js
-```
 
-### Spark
+El consumidor creará archivos JSONL en `primeraParte/consumer_output/`.
 
-1. Iniciar Spark master:
+### Verificar qué nodos Kafka están activos
+
+Desde el host o desde un contenedor con Kafka:
 
 ```bash
-cd /home/javi/redes/segundaParte
+docker ps | grep kafka
+```
+
+Dentro de un contenedor Kafka:
+
+```bash
+docker exec -it kafka1 bash
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --describe --topic ventas
+/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka1:9092
+```
+
+Para revisar el estado del grupo de consumidores:
+
+```bash
+/opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka1:9092 --describe --group grupo-examen-final
+```
+
+Si quieres ver los mensajes de un tópico con una herramienta de Kafka desde otro contenedor:
+
+```bash
+docker run --rm --network kafka-redes-final apache/kafka:latest \
+  /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka2:9092 --topic credo --from-beginning --group demo-console
+```
+
+7. Inicia Spark master y workers:
+
+cd segundaParte
 bash master.sh
-```
-
-2. Iniciar workers:
-
-```bash
 bash worker1.sh
 bash worker2.sh
-```
 
-3. Ejecutar el job Spark:
+8. Ejecuta el job Spark:
+
+bash run_spark_job.sh
+
+### Comandos útiles de Spark
+
+- Ver el estado del clúster Spark en la UI:
+
+  * Master: `http://localhost:8080`
+  * Workers: `http://localhost:8081`, `http://localhost:8082`
+
+- Ver procesos Spark en los contenedores:
 
 ```bash
-bash run_spark_job.sh
+docker ps | grep spark
 ```
 
-### Pruebas de tolerancia a fallos
+- Usar `spark-submit` directo si necesitas otro script:
 
-- Para Kafka: detener un nodo (`docker stop kafka2`) y verificar que el productor/conversor siguen funcionando con los demás nodos.
-- Para Spark: detener un worker (`docker stop spark-worker-1`) y observar que el job se sigue ejecutando con el worker restante.
+```bash
+/opt/spark/bin/spark-submit --master spark://spark-master:7077 /app/spark_example.py
+```
 
-## Nota importante
+- En el driver Spark puedes ejecutar un shell para pruebas:
 
-Si usas tres máquinas físicas reales, reemplaza las IPs en `primeraParte/Maquina1/run.sh`, `.../Maquina2/run.sh` y `.../Maquina3/run.sh` por la IP fija de cada equipo.
+```bash
+/opt/spark/bin/spark-shell --master spark://spark-master:7077
+```
+
+Notas:
+
+- Si usas la misma máquina para todo, `.env` puede quedarse igual y los scripts usarán los brokers definidos allí.
+- Si usas máquinas físicas diferentes, copia `.env` a cada host y cambia `ADVERTISED_IP` y `NODE_ID` en cada uno.
+- Si necesitas usar la red real en lugar de la red Docker, ajusta las IPs y puertos en `.env` y usa los scripts sin `--network` o con `--network host` según tu configuración.
+- Si un nodo Kafka cae, el consumidor seguirá leyendo desde los demás brokers cuando recupere conexión.

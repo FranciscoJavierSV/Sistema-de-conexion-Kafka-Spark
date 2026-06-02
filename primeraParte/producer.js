@@ -1,9 +1,14 @@
+require('dotenv').config();
 const { Kafka } = require('kafkajs');
 const { faker } = require('@faker-js/faker');
 
+const brokers = process.env.BROKERS
+  ? process.env.BROKERS.split(',').map((b) => b.trim())
+  : ['100.100.10.100:9094', '100.100.10.100:9096', '100.100.10.100:9098'];
+
 const kafka = new Kafka({
   clientId: 'proyecto-producer',
-  brokers: ['100.100.10.100:9094', '100.100.10.100:9096', '100.100.10.100:9098']
+  brokers,
 });
 
 const producer = kafka.producer();
@@ -14,6 +19,14 @@ const generarData = () => ({
   id_transaccion: faker.string.uuid(),
   monto: parseFloat(faker.commerce.price()),
   sucursal: faker.location.city(),
+  cliente: faker.person.fullName(),
+  producto: faker.commerce.product(),
+  cantidad: faker.number.int({ min: 1, max: 20 }),
+  moneda: 'MXN',
+  pais: faker.location.country(),
+  metodo_pago: faker.helpers.arrayElement(['tarjeta', 'efectivo', 'paypal', 'transferencia']),
+  fecha: faker.date.recent({ days: 30 }).toISOString(),
+  maquina: faker.helpers.arrayElement(['kafka1', 'kafka2', 'kafka3']),
 });
 
 const enviarCarga = async () => {

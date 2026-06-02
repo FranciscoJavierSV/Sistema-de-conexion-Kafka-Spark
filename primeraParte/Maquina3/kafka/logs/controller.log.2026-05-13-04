@@ -1,8 +1,0 @@
-[2026-05-13 04:03:46,736] INFO [QuorumController id=3] Replayed BrokerRegistrationChangeRecord modifying the registration for broker 1: BrokerRegistrationChangeRecord(brokerId=1, brokerEpoch=15, fenced=0, inControlledShutdown=1, logDirs=[]) (org.apache.kafka.controller.ClusterControlManager)
-[2026-05-13 04:03:48,566] INFO [QuorumController id=3] Replayed BrokerRegistrationChangeRecord modifying the registration for broker 2: BrokerRegistrationChangeRecord(brokerId=2, brokerEpoch=15330, fenced=0, inControlledShutdown=1, logDirs=[]) (org.apache.kafka.controller.ClusterControlManager)
-[2026-05-13 04:03:48,893] INFO [QuorumController id=3] Replayed BrokerRegistrationChangeRecord modifying the registration for broker 1: BrokerRegistrationChangeRecord(brokerId=1, brokerEpoch=15, fenced=1, inControlledShutdown=0, logDirs=[]) (org.apache.kafka.controller.ClusterControlManager)
-[2026-05-13 04:03:51,043] INFO [QuorumController id=3] In the new epoch 4, the leader is (none). (org.apache.kafka.controller.QuorumController)
-[2026-05-13 04:03:51,343] INFO [QuorumController id=3] In the new epoch 4, the leader is 2. (org.apache.kafka.controller.QuorumController)
-[2026-05-13 04:03:51,730] INFO [QuorumController id=3] Replayed BrokerRegistrationChangeRecord modifying the registration for broker 2: BrokerRegistrationChangeRecord(brokerId=2, brokerEpoch=15330, fenced=1, inControlledShutdown=0, logDirs=[]) (org.apache.kafka.controller.ClusterControlManager)
-[2026-05-13 04:03:52,718] INFO [QuorumController id=3] In the new epoch 5, the leader is (none). (org.apache.kafka.controller.QuorumController)
-[2026-05-13 04:03:57,080] INFO [QuorumController id=3] In the new epoch 6, the leader is (none). (org.apache.kafka.controller.QuorumController)
