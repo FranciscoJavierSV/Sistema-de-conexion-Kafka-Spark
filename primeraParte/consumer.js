@@ -5,7 +5,7 @@ const path = require('path');
 
 const brokers = process.env.BROKERS
   ? process.env.BROKERS.split(',').map((b) => b.trim())
-  : ['100.100.10.100:9094', '100.100.10.100:9096', '100.100.10.100:9098'];
+  : ['100.100.10.100:9094', '100.100.10.101:9096', '100.100.10.102:9098'];
 
 const kafka = new Kafka({
   clientId: 'proyecto-consumer',
