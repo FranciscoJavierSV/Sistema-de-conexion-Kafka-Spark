@@ -1,12 +1,16 @@
 #!/bin/bash
 set -e
 
-NETWORK=kafka-redes-final
-
-docker network inspect "$NETWORK" >/dev/null 2>&1 || docker network create "$NETWORK"
+# Load SPARK_MASTER_HOST / SPARK_MASTER_PORT from parent .env if present
+if [ -f "$(dirname "$0")/../.env" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$(dirname "$0")/../.env"
+  set +a
+fi
 
 docker run --rm \
-  --network "$NETWORK" \
+  --network host \
   -v "$(pwd)":/app \
   spark-nuevo:latest \
-  /opt/spark/bin/spark-submit --master spark://spark-master:7077 /app/spark_example.py
+  /opt/spark/bin/spark-submit --master spark://${SPARK_MASTER_HOST:-spark-master}:${SPARK_MASTER_PORT:-7077} /app/spark_example.py

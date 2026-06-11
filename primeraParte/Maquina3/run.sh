@@ -9,7 +9,20 @@ if [ -f "$(dirname "$0")/../../.env" ]; then
   set +a
 fi
 
-# valores por defecto específicos de esta máquina (puedes sobrescribir en .env)
+# Detectar automáticamente la máquina (Maquina1/2/3) y asignar variables M1_/M2_/M3_
+BASEDIR=$(basename "$(dirname "$0")")
+case "$BASEDIR" in
+  Maquina1) IDX=1 ;;
+  Maquina2) IDX=2 ;;
+  Maquina3) IDX=3 ;;
+  *) IDX=${NODE_ID:-3} ;;
+esac
+
+# Cargar valores específicos M${IDX}_* desde .env (si existen)
+eval "ADVERTISED_IP=\${M${IDX}_ADVERTISED_IP:-\$ADVERTISED_IP}"
+eval "HOST_PORT=\${M${IDX}_HOST_PORT:-\$HOST_PORT}"
+eval "NODE_ID=\${M${IDX}_NODE_ID:-\$NODE_ID}"
+
 ADVERTISED_IP=${ADVERTISED_IP:-100.100.10.102}
 HOST_PORT=${HOST_PORT:-9098}
 
@@ -17,13 +30,11 @@ docker run -it \
   --name kafka3 \
   --hostname kafka3 \
   --env-file "$(dirname "$0")/../../.env" \
-  --network kafka-redes-final \
-  -p ${HOST_PORT:-9098}:9092 \
-  -p $(( ${HOST_PORT:-9098} + 1 )):9093 \
+  --network host \
   -e KAFKA_NODE_ID=3 \
   -e KAFKA_PROCESS_ROLES=broker,controller \
   -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
-  -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 \
+  -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:${HOST_PORT},CONTROLLER://0.0.0.0:9093 \
   -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://${ADVERTISED_IP}:${HOST_PORT} \
   -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
   -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT \

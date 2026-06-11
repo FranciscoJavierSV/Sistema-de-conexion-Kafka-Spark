@@ -13,121 +13,161 @@
   - `worker1.sh`, `worker2.sh`: arranca dos trabajadores Spark.
   - `spark_example.py`: ejemplo de job Spark con JSON, CSV y SQL.
   - `run_spark_job.sh`: ejecuta el job Spark contra el clúster.
+# Proyecto Final ISC — Kafka + Spark
 
-## Qué ya tienes
+Este manual explica cómo desplegar y verificar el clúster Kafka (KRaft) y el
+clúster Spark en una red LAN (o Tailscale). Incluye comandos listos para usar
+y pasos de comprobación. Los scripts del repo ya han sido adaptados para usar
+`--network host` y para leer variables desde la raíz `.env` organizada por
+máquina (`M1_`, `M2_`, `M3_`).
 
-1. Un clúster Kafka básico en Docker con tres nodos `broker,controller`.
-2. Un productor y consumidor en Node.js para enviar y leer mensajes.
-3. Scripts para arrancar Spark master y workers.
+## Resumen rápido
+- Archivo de configuración principal: `.env` (contiene `M1_`, `M2_`, `M3_`).
+- Directorios principales: `primeraParte/` (Kafka), `segundaParte/` (Spark).
+- Scripts clave: `primeraParte/Maquina1/run.sh` (y Maquina2/Maquina3),
+  `segundaParte/master.sh`, `worker1.sh`, `worker2.sh`, `run_spark_job.sh`.
 
-## Qué falta o debe mejorarse
+## 1) Preparar `primeraParte/.env` para producer/consumer
 
-- Crear los tópicos con particiones y factor de replicación. Ahora hay un script para eso.
-- Generar y procesar datos con 100,000 filas.
-- Crear y procesar datos JSON/CSV/SQL en Spark.
-- Documentar y ejecutar pruebas de caída de nodo para tolerancia a fallos.
-- Ajustar direcciones IP en Kafka si usas tres máquinas físicas distintas.
+Ejecuta desde la raíz del repo (crea `primeraParte/.env` con los brokers y el
+quorum de controllers):
 
-## Uso recomendado
+```bash
+cd /ruta/al/repo
+set -a; source .env; set +a
+cat > primeraParte/.env <<EOF
+BROKERS=${M1_ADVERTISED_IP}:${M1_HOST_PORT},${M2_ADVERTISED_IP}:${M2_HOST_PORT},${M3_ADVERTISED_IP}:${M3_HOST_PORT}
+CONTROLLER_VOTERS=1@${M1_ADVERTISED_IP}:9093,2@${M2_ADVERTISED_IP}:9093,3@${M3_ADVERTISED_IP}:9093
+CLUSTER_ID=${CLUSTER_ID}
+EOF
+```
 
-1. Edita `.env` en la raíz del proyecto con los valores de tu red.
+## 2) Añadir `/etc/hosts` (evita UnknownHostException de Java)
 
-2. Crea la red Docker si no existe:
+En cada máquina ejecuta:
 
-docker network inspect kafka-redes-final >/dev/null 2>&1 || docker network create kafka-redes-final
+```bash
+sudo bash -c 'grep -q "100.100.10.100 kafka1" /etc/hosts || echo "100.100.10.100 kafka1" >> /etc/hosts'
+sudo bash -c 'grep -q "100.100.10.101 kafka2" /etc/hosts || echo "100.100.10.101 kafka2" >> /etc/hosts'
+sudo bash -c 'grep -q "100.100.10.102 kafka3" /etc/hosts || echo "100.100.10.102 kafka3" >> /etc/hosts'
+```
 
-3. Inicia los nodos Kafka:
+Si usas Tailscale reemplaza las IPs por las IPs de Tailscale correspondientes.
 
-bash primeraParte/Maquina1/run.sh
-bash primeraParte/Maquina2/run.sh
-bash primeraParte/Maquina3/run.sh
+## 3) Arranque de los nodos Kafka (orden recomendado)
 
-4. Crea los tópicos:
+- En Maquina1 (100.100.10.100):
 
-cd primeraParte
-bash create_topics.sh
+```bash
+cd /ruta/al/repo/primeraParte
+docker rm -f kafka1 || true
+bash Maquina1/run.sh
+```
 
-5. Instala dependencias y ejecuta el productor:
+- En Maquina2 y Maquina3 repite con `Maquina2/run.sh` y `Maquina3/run.sh`.
 
+## 4) Comprobaciones básicas tras arrancar
+
+- Ver contenedores activos:
+
+```bash
+docker ps --filter name=kafka
+```
+
+- Seguir logs (esperar que se conecten los peers y formen quorum):
+
+```bash
+docker logs -f kafka1
+```
+
+- Probar conectividad TCP (controller 9093 y listener cliente según M*_HOST_PORT):
+
+```bash
+nc -vz 100.100.10.100 9093
+nc -vz 100.100.10.100 9094   # M1_HOST_PORT=9094
+nc -vz 100.100.10.101 9096   # M2_HOST_PORT=9096
+```
+
+- Probar broker Kafka (si tienes utilidades Kafka instaladas):
+
+```bash
+/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 100.100.10.100:9094
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server 100.100.10.100:9094 --list
+```
+
+## 5) Ejecutar producer y consumer
+
+Desde `primeraParte/` (asegúrate de haber creado `primeraParte/.env`):
+
+```bash
 cd primeraParte
 npm install
-node producer.js
-
-6. Ejecuta el consumidor:
-
-cd primeraParte
-node consumer.js
-
-El consumidor creará archivos JSONL en `primeraParte/consumer_output/`.
-
-### Verificar qué nodos Kafka están activos
-
-Desde el host o desde un contenedor con Kafka:
-
-```bash
-docker ps | grep kafka
+node consumer.js &   # ejecuta en segundo plano
+node producer.js     # cuidado con el volumen de mensajes
 ```
 
-Dentro de un contenedor Kafka:
+El consumidor escribirá archivos JSONL en `primeraParte/consumer_output/`.
+
+## 6) Spark — iniciar master y workers
+
+- En la máquina configurada como Spark master (por defecto `SPARK_MASTER_HOST`):
 
 ```bash
-docker exec -it kafka1 bash
-/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --describe --topic ventas
-/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka1:9092
-```
-
-Para revisar el estado del grupo de consumidores:
-
-```bash
-/opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka1:9092 --describe --group grupo-examen-final
-```
-
-Si quieres ver los mensajes de un tópico con una herramienta de Kafka desde otro contenedor:
-
-```bash
-docker run --rm --network kafka-redes-final apache/kafka:latest \
-  /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka2:9092 --topic credo --from-beginning --group demo-console
-```
-
-7. Inicia Spark master y workers:
-
-cd segundaParte
+cd /ruta/al/repo/segundaParte
 bash master.sh
+```
+
+- En los hosts de los workers:
+
+```bash
 bash worker1.sh
 bash worker2.sh
+```
 
-8. Ejecuta el job Spark:
+- Ejecutar job Spark:
 
+```bash
 bash run_spark_job.sh
-
-### Comandos útiles de Spark
-
-- Ver el estado del clúster Spark en la UI:
-
-  * Master: `http://localhost:8080`
-  * Workers: `http://localhost:8081`, `http://localhost:8082`
-
-- Ver procesos Spark en los contenedores:
-
-```bash
-docker ps | grep spark
 ```
 
-- Usar `spark-submit` directo si necesitas otro script:
+## 7) Diagnóstico y troubleshooting rápido
+
+- `UnknownHostException: kafka1` → añadir `/etc/hosts` o usar IP en
+  `KAFKA_ADVERTISED_LISTENERS`.
+- `Connection to node X could not be established` → comprobar que el puerto
+  `9093` esté alcanzable en la IP indicada (nc, firewall/Tailscale ACL).
+- `producer` no conecta → revisar `primeraParte/.env` y que `BROKERS` tenga
+  las IP:PORT correctas.
+
+Comandos útiles:
 
 ```bash
-/opt/spark/bin/spark-submit --master spark://spark-master:7077 /app/spark_example.py
+# puertos escuchando
+ss -ltn | grep 9093
+
+# probar TCP
+nc -vz 100.100.10.101 9093
+
+# mapping de puertos del contenedor (si no usas host network)
+docker inspect kafka2 --format '{{json .NetworkSettings.Ports}}'
+
+# logs
+docker logs kafka2 | tail -n 200
 ```
 
-- En el driver Spark puedes ejecutar un shell para pruebas:
+## Notas finales
 
-```bash
-/opt/spark/bin/spark-shell --master spark://spark-master:7077
-```
+- Este manual asume que las IPs 100.100.10.100/101/102 son las rutas entre
+  tus hosts (por ejemplo IPs de Tailscale o LAN). Si usas otras IPs modifica
+  `.env` en consecuencia.
+- Los `run.sh` han sido adaptados para seleccionar automáticamente las
+  variables `M1_/M2_/M3_` desde `.env` y ejecutar en `--network host`.
 
-Notas:
+---
 
-- Si usas la misma máquina para todo, `.env` puede quedarse igual y los scripts usarán los brokers definidos allí.
-- Si usas máquinas físicas diferentes, copia `.env` a cada host y cambia `ADVERTISED_IP` y `NODE_ID` en cada uno.
-- Si necesitas usar la red real en lugar de la red Docker, ajusta las IPs y puertos en `.env` y usa los scripts sin `--network` o con `--network host` según tu configuración.
-- Si un nodo Kafka cae, el consumidor seguirá leyendo desde los demás brokers cuando recupere conexión.
+Si quieres, puedo generar un script `deploy_hosts.sh` que:
+- copie `primeraParte/.env` en cada host,
+- añada las entradas en `/etc/hosts`, y
+- arranque los `run.sh` via SSH en las tres máquinas.
+
+Indica el usuario SSH a usar si lo deseas.
