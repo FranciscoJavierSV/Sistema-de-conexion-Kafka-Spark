@@ -1,0 +1,341 @@
+===========================
+MANUAL APACHE SPARK
+CLÚSTER DISTRIBUIDO CON KAFKA
+=============================
+
+1. OBJETIVO
+
+Implementar un clúster distribuido de Apache Spark para procesar datos provenientes de Apache Kafka mediante Structured Streaming y almacenar los resultados en archivos JSON.
+
+Configuración del sistema:
+
+* 1 nodo Spark Master
+* 2 nodos Spark Worker
+* 3 Brokers Kafka
+
+===========================
+2. ARQUITECTURA DEL SISTEMA
+
+Kafka Producers
+↓
+Kafka
+↓
+Spark Master
+↓
+Spark Workers
+↓
+Transformaciones Spark
+↓
+Archivos JSON
+
+Funciones de cada componente:
+
+Master:
+
+* Coordina el clúster.
+* Recibe los trabajos Spark.
+* Distribuye tareas a los Workers.
+
+Workers:
+
+* Ejecutan el procesamiento distribuido.
+* Realizan las transformaciones de datos.
+
+Kafka:
+
+* Recibe y distribuye mensajes mediante topics.
+* Sirve como fuente de datos para Spark.
+
+===========================
+3. ESTRUCTURA DEL PROYECTO
+
+spark/
+│
+├── Master/
+│   └── Dockerfile
+│   │
+│   └── spark_job.py
+│
+├── Maquina2/
+│   └── Dockerfile
+│
+└── Maquina3/
+    └── Dockerfile
+
+
+===========================
+4. CONSTRUCCIÓN DE IMÁGENES
+
+Construir imagen del Master:
+
+docker build -t spark-master ./Master
+
+Construir imagen Worker 1:
+
+docker build -t spark-worker1 ./Maquina2
+
+Construir imagen Worker 2:
+
+docker build -t spark-worker2 ./Maquina3
+
+Verificar imágenes creadas:
+
+docker images
+
+===========================
+5. EJECUCIÓN DEL CLÚSTER
+
+MASTER
+dentro de la carpeta de master
+
+docker run -d 
+--network host 
+--name spark-master 
+-v $(pwd):/opt/spark-apps 
+spark-master
+
+WORKER 1
+
+docker run -d 
+--network host 
+--name spark-worker1 
+spark-worker1
+
+WORKER 2
+
+docker run -d 
+--network host 
+--name spark-worker2 
+spark-worker2
+
+Verificar contenedores activos:
+
+docker ps
+
+===========================
+6. VERIFICACIÓN DEL CLÚSTER
+
+Abrir la interfaz web del Master:
+
+http://100.100.10.103:8080
+
+La interfaz debe mostrar:
+
+* Master activo
+* Workers conectados
+* Recursos disponibles
+* Aplicaciones en ejecución
+
+Verificar que existan 2 Workers activos.
+
+===========================
+7. EJECUCIÓN DEL JOB PYSPARK
+
+Entrar al contenedor Master:
+
+docker exec -it spark-master bash
+
+Ejecutar el job:
+
+/opt/spark/bin/spark-submit 
+--master spark://100.100.10.103:7077 
+--conf spark.jars.ivy=/tmp/.ivy2 
+--packages org.apache.spark:spark-sql-kafka-0-10_2.13:4.1.2 
+/opt/spark-apps/spark_job.py
+
+===========================
+8. VERIFICACIÓN DE KAFKA
+
+Entrar al broker correspondiente:
+
+docker exec -it kafka1 bash
+
+Ir a la carpeta bin:
+
+cd /opt/kafka/bin
+
+Listar topics:
+
+./kafka-topics.sh 
+--bootstrap-server 100.100.10.103:9094 
+--list
+
+Consumir mensajes:
+
+./kafka-console-consumer.sh 
+--bootstrap-server 100.100.10.103:9094 
+--topic ventas_json 
+--from-beginning
+
+===========================
+9. FLUJO DE PROCESAMIENTO
+
+Kafka Producer
+↓
+Topics Kafka
+↓
+Spark Structured Streaming
+↓
+Lectura de mensajes
+↓
+Transformaciones
+↓
+Agrupaciones y agregaciones
+↓
+Escritura en archivos JSON
+
+===========================
+10. PROCESAMIENTO REALIZADO
+
+VENTAS
+
+* Lectura desde Kafka.
+* Conversión de JSON a DataFrame.
+* Agrupación por país.
+* Conteo de registros.
+* Suma de montos.
+
+LOGS
+
+* Lectura de mensajes.
+* Separación de palabras.
+* Conteo de ocurrencias mediante Word Count.
+
+MÉTRICAS
+
+* Lectura de eventos de monitoreo.
+* Procesamiento de métricas.
+* Generación de resultados agregados.
+
+===========================
+11. SALIDA DE DATOS
+
+Los resultados se almacenan en:
+
+/tmp/output/ventas/
+
+/tmp/output/logs/
+
+/tmp/output/metricas/
+
+Cada ejecución genera archivos:
+
+part-xxxxx.json
+
+Además Spark genera archivos auxiliares:
+
+_spark_metadata/
+
+*.crc
+
+Los archivos .crc son utilizados internamente por Spark y Hadoop.
+
+===========================
+12. CONSULTA DE RESULTADOS
+
+Listar archivos generados:
+
+find /tmp/output -name "*.json"
+
+Ver resultados de ventas:
+
+head -20 /tmp/output/ventas/part-*.json
+
+Ver resultados de logs:
+
+head -20 /tmp/output/logs/part-*.json
+
+Ver resultados de métricas:
+
+head -20 /tmp/output/metricas/part-*.json
+
+Mostrar archivo completo:
+
+cat /tmp/output/ventas/part-*.json
+
+Contar registros:
+
+cat /tmp/output/ventas/part-*.json | wc -l
+
+===========================
+13. MONITOREO
+
+INTERFAZ DEL MASTER
+
+http://100.100.10.103:8080
+
+Permite visualizar:
+
+* Workers conectados.
+* Recursos disponibles.
+* Aplicaciones activas.
+* Estado general del clúster.
+
+INTERFAZ DE LA APLICACIÓN
+
+http://100.100.10.103:4040
+
+Permite visualizar:
+
+* Jobs.
+* Stages.
+* Tasks.
+* Tiempo de ejecución.
+* Uso de recursos.
+* Estadísticas del procesamiento.
+
+===========================
+14. LOGS DEL CLÚSTER
+
+Logs del Master:
+
+docker logs spark-master
+
+Logs del Worker 1:
+
+docker logs spark-worker1
+
+Logs del Worker 2:
+
+docker logs spark-worker2
+
+Ver logs en tiempo real:
+
+docker logs -f spark-master
+
+===========================
+15. VALIDACIÓN FINAL
+
+Comprobar que:
+
+✓ Kafka está funcionando.
+
+✓ El Master está activo.
+
+✓ Los Workers están conectados.
+
+✓ La aplicación Spark está en ejecución.
+
+✓ Los Jobs aparecen en Spark UI.
+
+✓ Los datos son procesados correctamente.
+
+✓ Se generan archivos JSON en /tmp/output.
+
+✓ Los resultados pueden consultarse desde los archivos generados.
+
+===========================
+16. CONCLUSIÓN
+
+La implementación demuestra el funcionamiento de un clúster distribuido de Apache Spark integrado con Apache Kafka para el procesamiento de datos en tiempo real.
+
+El sistema permite:
+
+* Procesamiento distribuido.
+* Paralelismo mediante Workers.
+* Integración con Kafka.
+* Procesamiento mediante Structured Streaming.
+* Generación de resultados en formato JSON.
+* Monitoreo mediante Spark UI.
+* Escalabilidad horizontal agregando nuevos Workers.
+  ===========================

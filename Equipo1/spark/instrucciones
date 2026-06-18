@@ -1,0 +1,158 @@
+===========================
+MANUAL APACHE SPARK
+CLÚSTER DISTRIBUIDO
+===========================
+
+1. OBJETIVO
+
+Implementar un clúster distribuido de Apache Spark con 3 nodos físicos o contenedores:
+
+- 1 nodo Master
+- 2 nodos Worker
+
+El sistema procesa datos provenientes de Kafka y genera resultados en archivos JSON.
+
+===========================
+2. ARQUITECTURA
+
+Kafka → Spark Master → Spark Workers → Archivos JSON
+
+Roles:
+- Master: coordina el clúster y recibe los jobs
+- Workers: ejecutan el procesamiento distribuido
+
+===========================
+3. ESTRUCTURA DEL PROYECTO
+
+spark/
+│
+├── Master/ (MASTER)
+│   └── Dockerfile
+│
+├── Maquina2/ (WORKER)
+│   └── Dockerfile
+│
+├── Maquina3/ (WORKER)
+│   └── Dockerfile
+│
+└── spark_job.py
+
+===========================
+4. CONSTRUCCIÓN DE IMÁGENES
+
+Master:
+docker build -t spark-master ./Master
+
+Workers:
+docker build -t spark-worker ./Maquina2
+docker build -t spark-worker ./Maquina3
+
+===========================
+5. EJECUCIÓN DEL CLÚSTER
+
+Master:
+docker run -d \
+  --network host \
+  --name spark-master \
+  -v $(pwd):/opt/spark-apps \
+  spark-master
+
+Worker 1:
+docker run -d \
+  --network host \
+  --name spark-worker1 \
+  spark-worker
+
+Worker 2:
+docker run -d \
+  --network host \
+  --name spark-worker2 \
+  spark-worker
+
+===========================
+6. VERIFICACIÓN
+
+Spark UI:			en caso contrario la ip de quien sea el master 
+http://100.100.10.100:8080
+
+Debe mostrar:
+- Master activo
+- 2 Workers conectados
+- Recursos disponibles
+- Jobs ejecutándose
+
+===========================
+7. EJECUCIÓN DEL JOB PYSPARK
+
+
+Entrar al contenedor:
+docker exec -it spark-master bash
+
+Ejecutar job:
+/opt/spark/bin/spark-submit \
+  --master spark://100.100.10.100:7077 \
+  /opt/spark-apps/spark_job.py
+
+===========================
+8. FLUJO DEL SISTEMA
+
+Kafka Producer → Topics
+        ↓
+Spark Master (spark-submit)
+        ↓
+Workers procesan datos
+        ↓
+Transformaciones en Spark
+        ↓
+Archivos JSON en /tmp/output/
+
+===========================
+9. PROCESAMIENTO
+
+- Lectura desde Kafka
+- Parseo de JSON
+- Limpieza de datos
+- Agrupaciones (groupBy)
+- Conteos y agregaciones
+
+===========================
+10. SALIDA
+
+Resultados guardados en:
+
+/tmp/output/ventas/
+/tmp/output/logs/
+
+Formato:
+- JSON distribuido por particiones
+
+===========================
+11. MONITOREO
+
+Spark UI:
+http://100.100.10.100:8080
+
+Permite ver:
+- Jobs activos
+- Stages
+- Tasks por worker
+- Uso de CPU y memoria
+
+===========================
+12. VALIDACIÓN
+
+- Ver workers conectados
+- Ver jobs en Spark UI
+- Ver archivos generados en /tmp/output/
+- Ver logs del cluster
+
+===========================
+13. CONCLUSIÓN
+
+Este sistema demuestra:
+- Procesamiento distribuido
+- Paralelismo real
+- Escalabilidad horizontal
+- Integración con Kafka
+- Persistencia de resultados en archivos
+===========================

@@ -1,0 +1,164 @@
+==========================
+PROYECTO KAFKA - GUIA DE EJECUCION
+==========================
+
+1. LEVANTAR LOS CONTENEDORES (KAFKA CLUSTER)
+
+Algunos faltan en la red acomoden sus ip a las ip correspondientes porfa
+
+En cada máquina dependiendo su ip que coincida con el archivo de dockerfile :
+equipo1:		equipo2:
+javi kafka1		oscar kafka1
+brandon kafka2		azael kafka2
+gael kafka3		uriel kafka3
+
+estar en la carpeta de kafka y crear la imagen correspondiente a tu equipo si ejecutas dentro de tu carpeta solo se cambia ./Maquina1 por .
+docker build -t kafka1 ./Maquina1
+
+ejecutar con esos parametros si falla algo relacionado a host no tengo ni idea (no he probado que pasa en windows xddd)
+
+docker run -d --network host --name kafka1 kafka1
+docker run -d --network host --name kafka2 kafka2
+docker run -d --network host --name kafka3 kafka3
+
+Verificar que están activos:
+
+docker ps
+
+Debe aparecer:
+kafka1, kafka2, kafka3 en estado "Up"
+
+
+------------------------------------------------
+
+2. VERIFICAR CONECTIVIDAD DEL CLUSTER (KRAFT)
+
+Entrar a cualquier nodo (cambie el nombre de su contenedor):
+
+docker exec -it kafka1 bash
+
+Ver estado del cluster cambiar la ip a la ip propia:
+
+/opt/kafka/bin/kafka-metadata-quorum.sh \
+--bootstrap-server 100.100.10.100:9094 \
+describe --status
+
+Validar:
+- ClusterId existente
+- LeaderId asignado
+- CurrentVoters = 1,2,3
+
+
+------------------------------------------------
+
+3. VERIFICAR TOPICOS (DESPUES DE CREARLOS CON TU SH) si no puedes ejecutar el sh solo abrelo y toma el codigo de adeentro y ejecutalo
+
+importante (solo uno cree los topicos los demas copian los topicos)
+
+Listar tópicos (tener en cuenta el nombre e ip):
+
+docker exec kafka1 \
+/opt/kafka/bin/kafka-topics.sh \
+--list \
+--bootstrap-server 100.100.10.100:9094
+
+Ver detalles de un tópico (tener en cuenta el nombre e ip):
+
+docker exec kafka1 \
+/opt/kafka/bin/kafka-topics.sh \
+--describe \
+--topic ventas_json \
+--bootstrap-server 100.100.10.100:9094
+
+Validar:
+- Particiones (3)
+- Replication factor (3)
+- Leader asignado por partición
+
+
+------------------------------------------------
+
+4. EJECUTAR PRODUCER
+
+Instalar dependencias (solo una vez):
+
+npm install
+
+Ejecutar producer:
+
+node producer.js
+
+Validar:
+- "Producer conectado"
+- "Lote enviado"
+- No errores de host o partición
+
+
+------------------------------------------------
+
+5. EJECUTAR CONSUMER
+
+siempre y cuando quieran revisar aparte el kafka ya que spark normalmente consume los datos y almacena 
+Ejecutar consumer:
+
+node consumer.js
+
+Validar:
+- "Consumer conectado"
+- Mensajes recibidos
+- Logs de particiones
+
+Los datos se guardan en:
+
+consumer_output/kafka_consumido.jsonl
+
+
+------------------------------------------------
+
+6. PRUEBA DE TOLERANCIA A FALLLOS (IMPORTANTE)
+
+Apagar un nodo:
+
+docker stop kafka2
+
+Revisar cluster:
+
+ejecutar el codigo dentro de un contenedor activo
+/opt/kafka/bin/kafka-metadata-quorum.sh --status
+
+Validar:
+- Nuevo LeaderId asignado
+- El sistema sigue funcionando
+
+
+------------------------------------------------
+
+7. REINICIO DE NODOS (SI SE CAEN)
+
+docker start kafka2
+
+Verificar:
+
+docker ps
+
+
+------------------------------------------------
+
+8. RESUMEN DEL FLUJO
+
+Producer
+   ↓
+Kafka Cluster (3 nodos KRaft)
+   ↓
+Topics (5 tópicos)
+   ↓
+Partitions (3 por tópico)
+   ↓
+Consumer Group
+   ↓
+Archivo JSONL
+
+
+==========================
+FIN DE LA GUIA
+==========================
