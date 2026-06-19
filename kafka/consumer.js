@@ -1,15 +1,11 @@
-require('dotenv').config();
 const { Kafka } = require('kafkajs');
-const fs = require('fs');
-const path = require('path');
+const { MongoClient } = require('mongodb');
 
-const brokers = process.env.BROKERS
-  ? process.env.BROKERS.split(',').map((b) => b.trim())
-  : [
-      '100.100.10.103:9094',
-      '100.100.10.104:9096',
-      '100.100.10.105:9098'
-    ];
+const brokers = [
+  '100.100.10.100:9094',
+  '100.100.10.101:9096',
+  '100.100.10.102:9098'
+];
 
 const kafka = new Kafka({
   clientId: 'proyecto-consumer',
@@ -20,18 +16,7 @@ const consumer = kafka.consumer({
   groupId: 'grupo-examen-final',
 });
 
-const outputDir = path.resolve(__dirname, 'consumer_output');
-
-if (!fs.existsSync(outputDir)) {
-  fs.mkdirSync(outputDir, { recursive: true });
-}
-
-const outputFile = path.join(
-  outputDir,
-  'kafka_consumido.jsonl'
-);
-
-let totalMensajes = 0;
+const mongoClient = new MongoClient('mongodb://localhost:27017');
 
 const TOPICOS = [
   'ventas_json',
@@ -41,7 +26,20 @@ const TOPICOS = [
   'metricas'
 ];
 
+let totalMensajes = 0;
+
 const recibir = async () => {
+  // Conectar a MongoDB
+  await mongoClient.connect();
+
+  const db = mongoClient.db('kafka_db');
+
+  console.log('=================================');
+  console.log('MongoDB conectado');
+  console.log('Base de datos: kafka_db');
+  console.log('=================================');
+
+  // Conectar a Kafka
   await consumer.connect();
 
   for (const topic of TOPICOS) {
@@ -62,7 +60,6 @@ const recibir = async () => {
       partition,
       message,
     }) => {
-
       totalMensajes++;
 
       const rawValue = message.value.toString();
@@ -79,19 +76,19 @@ const recibir = async () => {
         topic,
         partition,
         offset: Number(message.offset),
-        timestamp: message.timestamp,
+        timestamp: new Date(Number(message.timestamp)),
         data: contenido,
+        fechaInsercion: new Date(),
       };
 
-      fs.appendFileSync(
-        outputFile,
-        JSON.stringify(registro) + '\n'
-      );
+      // Guarda cada tópico en su propia colección
+      const collection = db.collection(topic);
+
+      await collection.insertOne(registro);
 
       if (totalMensajes % 1000 === 0) {
         console.log(
-          `[${new Date().toLocaleTimeString()}] ` +
-          `Consumidos: ${totalMensajes}`
+          `[${new Date().toLocaleTimeString()}] Consumidos: ${totalMensajes}`
         );
       }
     },

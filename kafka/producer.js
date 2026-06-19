@@ -5,9 +5,9 @@ const { faker } = require('@faker-js/faker');
 const brokers = process.env.BROKERS
   ? process.env.BROKERS.split(',').map(b => b.trim())
   : [
-      '100.100.10.100:9094',
-      '100.100.10.101:9096',
-      '100.100.10.102:9098'
+  '100.100.10.100:9094',
+  '100.100.10.101:9096',
+  '100.100.10.102:9098'
     ];
 
 const kafka = new Kafka({
@@ -21,7 +21,7 @@ const kafka = new Kafka({
 
 const producer = kafka.producer();
 
-const TOTAL_REGISTROS = 100000;
+const TOTAL_REGISTROS = 10000;
 const BATCH_SIZE = 1000;
 
 function generarJSON() {

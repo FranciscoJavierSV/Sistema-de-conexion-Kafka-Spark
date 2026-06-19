@@ -1,4 +1,1 @@
-.env
-**/.env
-primeraParte/node_modules/
-
+kafka/node_modules/
